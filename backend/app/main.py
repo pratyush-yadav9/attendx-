@@ -145,26 +145,10 @@ def health_check():
 
 
 @app.get("/")
-@app.get("/login")
-@app.get("/verify")
-@app.get("/index.html")
-def serve_spa_page():
-    index_file = os.path.join(FRONTEND_DIST, "index.html")
-    if os.path.exists(index_file):
-        return FileResponse(index_file)
+def api_root():
     return {
         "success": True,
         "message": "AttendX — Intelligent Attendance & Anti-Proxy System API is running.",
         "documentation": "/docs",
         "environment": settings.ENVIRONMENT
     }
-
-
-@app.get("/{full_path:path}")
-def catch_all_spa_routes(full_path: str):
-    if full_path.startswith("api/") or full_path.startswith("uploads/") or full_path.startswith("docs") or full_path.startswith("openapi.json"):
-        raise StarletteHTTPException(status_code=404, detail="Not Found")
-    index_file = os.path.join(FRONTEND_DIST, "index.html")
-    if os.path.exists(index_file):
-        return FileResponse(index_file)
-    raise StarletteHTTPException(status_code=404, detail="Not Found")
