@@ -79,6 +79,20 @@ try:
 except Exception:
     pass
 
+# Serve compiled frontend assets and SPA pages if available
+from fastapi.responses import FileResponse, HTMLResponse
+
+FRONTEND_DIST = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist"))
+if not os.path.exists(FRONTEND_DIST):
+    FRONTEND_DIST = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
+
+assets_dir = os.path.join(FRONTEND_DIST, "assets")
+if os.path.exists(assets_dir):
+    try:
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="frontend-assets")
+    except Exception:
+        pass
+
 
 
 # Standardized error response handling as per Section 50
@@ -121,8 +135,23 @@ app.include_router(analytics_router)
 app.include_router(attendance_management_router, prefix="/api/v1/attendance-management", tags=["Attendance Management"])
 
 
+@app.get("/api/health")
+def health_check():
+    return {
+        "success": True,
+        "status": "healthy",
+        "timestamp": os.path.exists("attendx.db")
+    }
+
+
 @app.get("/")
-def root():
+@app.get("/login")
+@app.get("/verify")
+@app.get("/index.html")
+def serve_spa_page():
+    index_file = os.path.join(FRONTEND_DIST, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
     return {
         "success": True,
         "message": "AttendX — Intelligent Attendance & Anti-Proxy System API is running.",
@@ -131,10 +160,11 @@ def root():
     }
 
 
-@app.get("/api/health")
-def health_check():
-    return {
-        "success": True,
-        "status": "healthy",
-        "timestamp": os.path.exists("attendx.db")
-    }
+@app.get("/{full_path:path}")
+def catch_all_spa_routes(full_path: str):
+    if full_path.startswith("api/") or full_path.startswith("uploads/") or full_path.startswith("docs") or full_path.startswith("openapi.json"):
+        raise StarletteHTTPException(status_code=404, detail="Not Found")
+    index_file = os.path.join(FRONTEND_DIST, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
+    raise StarletteHTTPException(status_code=404, detail="Not Found")
