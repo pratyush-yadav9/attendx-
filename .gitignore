@@ -1,0 +1,201 @@
+# ==========================================
+# AttendX — Production Git Ignore Rules
+# ==========================================
+
+# ------------------------------------------
+# Environment & Sensitive Files
+# ------------------------------------------
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+*.env
+backend/.env
+frontend/.env
+frontend/.env.local
+*.pem
+*.key
+*.cert
+*.crt
+*.pfx
+secrets/
+
+# Track example configurations
+!.env.example
+!backend/.env.example
+!frontend/.env.example
+
+# ------------------------------------------
+# Databases & Local State
+# ------------------------------------------
+*.db
+*.sqlite
+*.sqlite3
+attendx.db
+backend/attendx.db
+app/attendx.db
+*.db-journal
+*.db-wal
+*.db-shm
+dump.rdb
+
+# ------------------------------------------
+# Python & Virtual Environments
+# ------------------------------------------
+__pycache__/
+*/__pycache__/
+*/**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Build & packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Testing & code quality
+.pytest_cache/
+*/.pytest_cache/
+*/**/.pytest_cache/
+.coverage
+.coverage.*
+coverage/
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
+
+# ------------------------------------------
+# Node.js & Frontend (Vite / React / TS)
+# ------------------------------------------
+node_modules/
+*/node_modules/
+frontend/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.pnpm-store/
+
+# Build artifacts & Vite cache
+frontend/dist/
+dist/
+frontend/dist-ssr/
+dist-ssr/
+.vite/
+frontend/.vite/
+*.tsbuildinfo
+.eslintcache
+.stylelintcache
+
+# ------------------------------------------
+# Vercel & Deployment Artifacts
+# ------------------------------------------
+.vercel/
+frontend/.vercel/
+backend/.vercel/
+.output/
+.turbo/
+
+# ------------------------------------------
+# Uploads, Media & Temporary Captures
+# ------------------------------------------
+# Exclude dynamic attendance webcam snapshots (preserve directory structure)
+uploads/attendance_photos/*
+!uploads/attendance_photos/.gitkeep
+backend/uploads/attendance_photos/*
+!backend/uploads/attendance_photos/.gitkeep
+
+# Exclude student profiles & uploads (preserve directory structure)
+uploads/student_profiles/*
+!uploads/student_profiles/.gitkeep
+backend/uploads/student_profiles/*
+!backend/uploads/student_profiles/.gitkeep
+
+# Exclude temporary webcam snapshot captures
+webcam_*.jpg
+temp_face_*.jpg
+test_face_*.jpg
+*.tmp.jpg
+scratch_thumb.png
+scratch*
+
+# ------------------------------------------
+# IDEs & Code Editors
+# ------------------------------------------
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+*.code-workspace
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*.swo
+*~
+
+# ------------------------------------------
+# Operating System Files
+# ------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# ------------------------------------------
+# Logs, Temporary & Scratch Files
+# ------------------------------------------
+*.log
+logs/
+backend/logs/
+*.tmp
+*.temp
+tmp/
+temp/
+scratch/
+.system_generated/
+.gemini/
+*.bak
+*.backup
+*.orig
+*.rej
+fix_*.py
+create_html.py
+setup.py
+static/
