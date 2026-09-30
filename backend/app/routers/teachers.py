@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy.orm import Session
 from datetime import datetime, date
 from typing import List, Optional
+from urllib.parse import urlparse
 
 from app.database import get_db
 from app.models.user import Teacher, User, Student
@@ -26,8 +27,22 @@ from app.services.audit_service import AuditService
 router = APIRouter(prefix="/api/v1/teachers", tags=["Teacher Features"])
 
 
+def get_request_base_url(request: Request, passed_url: Optional[str] = None) -> Optional[str]:
+    """Helper to detect frontend origin from request or query parameter."""
+    if passed_url and passed_url.strip().startswith("http"):
+        return passed_url.strip().rstrip("/")
+    origin = request.headers.get("origin") or request.headers.get("referer")
+    if origin:
+        p = urlparse(origin)
+        if p.scheme and p.netloc:
+            return f"{p.scheme}://{p.netloc}"
+    return None
+
+
 @router.get("/dashboard")
 def get_teacher_dashboard(
+    request: Request,
+    base_url: Optional[str] = Query(None),
     auth_data: tuple[User, Teacher] = Depends(require_teacher),
     db: Session = Depends(get_db)
 ):
@@ -79,13 +94,14 @@ def get_teacher_dashboard(
         ClassSession.status == SessionStatus.ACTIVE.value
     ).order_by(ClassSession.start_time.desc()).first()
 
+    req_base_url = get_request_base_url(request, base_url)
     active_session_data = None
     if active_session:
         token = active_session.current_qr_token
         if not token:
-            token, qr_data_url, expires_at = QRService.generate_session_qr(db, active_session)
+            token, qr_data_url, expires_at = QRService.generate_session_qr(db, active_session, base_url=req_base_url)
         else:
-            qr_data_url = QRService.get_qr_image_data_url(token)
+            qr_data_url = QRService.get_qr_image_data_url(token, base_url=req_base_url)
             expires_at = active_session.qr_expires_at
 
         total_marked = db.query(AttendanceRecord).filter(
@@ -169,6 +185,8 @@ def get_teacher_dashboard(
 @router.post("/classes/start", status_code=status.HTTP_201_CREATED)
 def start_class_session(
     data: StartSessionRequest,
+    request: Request,
+    base_url: Optional[str] = Query(None),
     auth_data: tuple[User, Teacher] = Depends(require_teacher),
     db: Session = Depends(get_db)
 ):
@@ -178,6 +196,7 @@ def start_class_session(
     Teacher can only start classes for assigned subjects.
     """
     user, teacher = auth_data
+    req_base_url = get_request_base_url(request, base_url)
 
     # Verify assignment
     assignment = db.query(TeacherSubjectAssignment).filter(
@@ -205,7 +224,7 @@ def start_class_session(
 
     if existing_active:
         # Return existing active session with refreshed QR
-        token, qr_data_url, expires_at = QRService.generate_session_qr(db, existing_active)
+        token, qr_data_url, expires_at = QRService.generate_session_qr(db, existing_active, base_url=req_base_url)
         return {
             "success": True,
             "message": "Resumed existing active class session.",
@@ -238,7 +257,7 @@ def start_class_session(
     db.add(new_session)
     db.flush()
 
-    token, qr_data_url, expires_at = QRService.generate_session_qr(db, new_session)
+    token, qr_data_url, expires_at = QRService.generate_session_qr(db, new_session, base_url=req_base_url)
 
     AuditService.log(
         db=db,
@@ -276,6 +295,8 @@ def start_class_session(
 @router.post("/classes/{session_id}/refresh-qr")
 def refresh_class_qr(
     session_id: str,
+    request: Request,
+    base_url: Optional[str] = Query(None),
     auth_data: tuple[User, Teacher] = Depends(require_teacher),
     db: Session = Depends(get_db)
 ):
@@ -283,6 +304,7 @@ def refresh_class_qr(
     Refreshes the dynamic QR code for an active session to prevent screenshot reuse.
     """
     user, teacher = auth_data
+    req_base_url = get_request_base_url(request, base_url)
     session = db.query(ClassSession).filter(
         ClassSession.id == session_id,
         ClassSession.teacher_id == teacher.id
@@ -300,7 +322,7 @@ def refresh_class_qr(
             detail=f"Cannot refresh QR for a class with status '{session.status}'."
         )
 
-    token, qr_data_url, expires_at = QRService.generate_session_qr(db, session)
+    token, qr_data_url, expires_at = QRService.generate_session_qr(db, session, base_url=req_base_url)
 
     return {
         "success": True,
@@ -367,6 +389,8 @@ def close_class_session(
 @router.get("/classes/{session_id}/live")
 def get_live_class_attendance(
     session_id: str,
+    request: Request,
+    base_url: Optional[str] = Query(None),
     auth_data: tuple[User, Teacher] = Depends(require_teacher),
     db: Session = Depends(get_db)
 ):
@@ -374,6 +398,7 @@ def get_live_class_attendance(
     Live stream of students who marked attendance in this session.
     """
     user, teacher = auth_data
+    req_base_url = get_request_base_url(request, base_url)
     session = db.query(ClassSession).filter(
         ClassSession.id == session_id,
         ClassSession.teacher_id == teacher.id
@@ -407,9 +432,9 @@ def get_live_class_attendance(
     qr_expires_at = session.qr_expires_at
 
     if qr_token:
-        qr_data_url = QRService.get_qr_image_data_url(qr_token)
+        qr_data_url = QRService.get_qr_image_data_url(qr_token, base_url=req_base_url)
     elif session.status == SessionStatus.ACTIVE.value:
-        qr_token, qr_data_url, qr_expires_at = QRService.generate_session_qr(db, session)
+        qr_token, qr_data_url, qr_expires_at = QRService.generate_session_qr(db, session, base_url=req_base_url)
 
     return {
         "success": True,

@@ -11,9 +11,49 @@ from app.models.attendance import ClassSession, SessionStatus
 
 class QRService:
     @staticmethod
+    def _resolve_base_url(custom_base_url: Optional[str] = None) -> str:
+        """
+        Dynamically resolves the public base URL for student verification.
+        Prioritizes:
+        1. Explicitly passed custom_base_url (e.g. from frontend window.location.origin)
+        2. FRONTEND_URL environment variable
+        3. Vercel deployment variables (VERCEL_PROJECT_PRODUCTION_URL, VERCEL_URL)
+        4. Production domain fallback: https://attendx-ten-lemon.vercel.app
+        5. Local LAN IP only when running locally on localhost/127.0.0.1
+        """
+        if custom_base_url and custom_base_url.strip().startswith("http"):
+            return custom_base_url.strip().rstrip("/")
+
+        env_frontend = os.environ.get("FRONTEND_URL")
+        if env_frontend and env_frontend.strip().startswith("http"):
+            return env_frontend.strip().rstrip("/")
+
+        if os.environ.get("VERCEL"):
+            vercel_prod = os.environ.get("VERCEL_PROJECT_PRODUCTION_URL")
+            if vercel_prod:
+                return f"https://{vercel_prod}".rstrip("/")
+            vercel_url = os.environ.get("VERCEL_URL")
+            if vercel_url:
+                return f"https://{vercel_url}".rstrip("/")
+            return "https://attendx-ten-lemon.vercel.app"
+
+        base_url = settings.FRONTEND_URL.rstrip("/")
+        if ("localhost" in base_url or "127.0.0.1" in base_url) and not os.environ.get("VERCEL"):
+            try:
+                import socket
+                lan_ip = socket.gethostbyname(socket.gethostname())
+                if lan_ip and not lan_ip.startswith("127."):
+                    return f"http://{lan_ip}:5173"
+            except Exception:
+                pass
+
+        return base_url
+
+    @staticmethod
     def generate_session_qr(
         db: Session,
-        session: ClassSession
+        session: ClassSession,
+        base_url: Optional[str] = None
     ) -> Tuple[str, str, datetime]:
         """
         Generates a new dynamic QR token for an active class session,
@@ -26,41 +66,17 @@ class QRService:
         session.qr_expires_at = expires_at
         db.commit()
 
-        # The QR code contains a direct URL or token to open the mobile attendance verification page
-        # If FRONTEND_URL is localhost, resolve to LAN IP so mobile devices on the same Wi-Fi can scan and connect
-        base_url = settings.FRONTEND_URL
-        if "localhost" in base_url or "127.0.0.1" in base_url:
-            try:
-                import socket
-                lan_ip = socket.gethostbyname(socket.gethostname())
-                if lan_ip and not lan_ip.startswith("127."):
-                    base_url = f"http://{lan_ip}:5173"
-            except Exception:
-                pass
-
-        verification_url = f"{base_url}/verify?token={token}"
-
-        # Generate QR image in memory
-        qr_data_url = QRService.get_qr_image_data_url(token)
+        qr_data_url = QRService.get_qr_image_data_url(token, base_url=base_url)
 
         return token, qr_data_url, expires_at
 
     @staticmethod
-    def get_qr_image_data_url(token: str) -> str:
+    def get_qr_image_data_url(token: str, base_url: Optional[str] = None) -> str:
         """
         Renders a dynamic QR code image for a verification token and returns base64 PNG data URL.
         """
-        base_url = settings.FRONTEND_URL
-        if "localhost" in base_url or "127.0.0.1" in base_url:
-            try:
-                import socket
-                lan_ip = socket.gethostbyname(socket.gethostname())
-                if lan_ip and not lan_ip.startswith("127."):
-                    base_url = f"http://{lan_ip}:5173"
-            except Exception:
-                pass
-
-        verification_url = f"{base_url}/verify?token={token}"
+        resolved_base = QRService._resolve_base_url(base_url)
+        verification_url = f"{resolved_base}/verify?token={token}"
 
         qr = qrcode.QRCode(
             version=1,

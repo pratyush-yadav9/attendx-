@@ -21,10 +21,14 @@ class Settings(BaseSettings):
     COLLEGE_LONGITUDE: float = 77.2090
     COLLEGE_RADIUS_METERS: float = 150.0
     
-    FRONTEND_URL: str = "http://localhost:5173"
+    FRONTEND_URL: str = os.environ.get("FRONTEND_URL") or (
+        "https://attendx-ten-lemon.vercel.app" if os.environ.get("VERCEL") else "http://localhost:5173"
+    )
     REDIS_URL: str = "redis://localhost:6379/0"
     
     ALLOWED_ORIGINS: List[str] = [
+        "https://attendx-ten-lemon.vercel.app",
+        "https://attendx-attendx1.vercel.app",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:3000",

@@ -44,15 +44,21 @@ export interface CloseClassResponse {
 
 export const teacherService = {
   async getDashboard(): Promise<TeacherDashboardData> {
-    return api.get<TeacherDashboardData>('/teachers/dashboard');
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const query = origin ? `?base_url=${encodeURIComponent(origin)}` : '';
+    return api.get<TeacherDashboardData>(`/teachers/dashboard${query}`);
   },
 
   async startClass(data: StartClassPayload): Promise<StartClassResponse> {
-    return api.post<StartClassResponse>('/teachers/classes/start', data);
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const query = origin ? `?base_url=${encodeURIComponent(origin)}` : '';
+    return api.post<StartClassResponse>(`/teachers/classes/start${query}`, data);
   },
 
   async refreshQR(sessionId: string): Promise<RefreshQRResponse> {
-    return api.post<RefreshQRResponse>(`/teachers/classes/${sessionId}/refresh-qr`);
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const query = origin ? `?base_url=${encodeURIComponent(origin)}` : '';
+    return api.post<RefreshQRResponse>(`/teachers/classes/${sessionId}/refresh-qr${query}`);
   },
 
   async closeClass(sessionId: string): Promise<CloseClassResponse> {
@@ -60,7 +66,9 @@ export const teacherService = {
   },
 
   async getLiveAttendance(sessionId: string): Promise<LiveSessionAttendance> {
-    return api.get<LiveSessionAttendance>(`/teachers/classes/${sessionId}/live`);
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const query = origin ? `?base_url=${encodeURIComponent(origin)}` : '';
+    return api.get<LiveSessionAttendance>(`/teachers/classes/${sessionId}/live${query}`);
   },
 
   async getSessions(): Promise<TeacherSessionItem[]> {
