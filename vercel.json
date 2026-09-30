@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "installCommand": "pip install -r requirements.txt && npm install --prefix frontend --legacy-peer-deps",
   "buildCommand": "npm run build --prefix frontend",
   "outputDirectory": "frontend/dist",
   "rewrites": [
@@ -19,10 +18,6 @@
     {
       "source": "/openapi.json",
       "destination": "/api/index.py"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
     }
   ]
 }
