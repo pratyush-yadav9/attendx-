@@ -1,3 +1,4 @@
+import os
 import qrcode
 import io
 import base64

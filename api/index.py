@@ -8,3 +8,12 @@ if backend_root not in sys.path:
 
 # Import the real AttendX FastAPI app
 from app.main import app  # noqa
+from app.database import init_db
+from app.seed import seed_database
+
+# Ensure database tables and initial accounts exist on serverless cold-start
+try:
+    init_db()
+    seed_database()
+except Exception as e:
+    print(f"[AttendX] Serverless cold-start seed: {e}")

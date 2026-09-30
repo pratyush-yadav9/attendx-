@@ -152,7 +152,7 @@ def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
         }
 
     # Generate token
-    token = create_access_token({"sub": user.id, "role": user.role})
+    token = create_access_token({"sub": user.id, "email": user.email, "role": user.role})
 
     # Prepare user summary
     user_info = {
@@ -215,7 +215,7 @@ def verify_hod_otp(data: HodOtpVerifyRequest, db: Session = Depends(get_db)):
             detail="Invalid OTP code. Please enter the correct verification code."
         )
 
-    token = create_access_token({"sub": user.id, "role": user.role})
+    token = create_access_token({"sub": user.id, "email": user.email, "role": user.role})
     admin = user.admin_profile
 
     return {

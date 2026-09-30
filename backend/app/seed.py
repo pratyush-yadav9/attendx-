@@ -1,9 +1,14 @@
 import os
 import sys
+import uuid
 from datetime import datetime, date, timedelta
 
 # Ensure backend root is in sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+def fixed_id(name: str) -> str:
+    """Generate deterministic static UUIDs so IDs remain stable across serverless cold starts."""
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, f"attendx_{name}"))
 
 from app.database import SessionLocal, init_db
 from app.dependencies import hash_password
@@ -96,6 +101,7 @@ def seed_database():
         # 7. HOD Admin Account
         print("[Seed] Creating HOD / Admin account...")
         hod_user = User(
+            id=fixed_id("user_hod_cse"),
             email="hod.cse@college.edu",
             hashed_password=hash_password("Password@123"),
             full_name="Dr. Rajesh Sharma",
@@ -108,6 +114,7 @@ def seed_database():
         db.flush()
 
         hod_admin = Admin(
+            id=fixed_id("admin_hod_cse"),
             user_id=hod_user.id,
             employee_id="EMP-HOD-01",
             department_id=dept_cse.id,
@@ -119,6 +126,7 @@ def seed_database():
         # 8. Teachers
         print("[Seed] Creating Teachers...")
         teacher1_user = User(
+            id=fixed_id("user_prof_amit"),
             email="prof.amit@college.edu",
             hashed_password=hash_password("Password@123"),
             full_name="Prof. Amit Sharma",
@@ -130,6 +138,7 @@ def seed_database():
         db.flush()
 
         teacher1 = Teacher(
+            id=fixed_id("teacher_prof_amit"),
             user_id=teacher1_user.id,
             employee_id="EMP-TCH-01",
             department_id=dept_cse.id,
@@ -140,6 +149,7 @@ def seed_database():
         db.flush()
 
         teacher2_user = User(
+            id=fixed_id("user_prof_sneha"),
             email="prof.sneha@college.edu",
             hashed_password=hash_password("Password@123"),
             full_name="Prof. Sneha Gupta",
@@ -151,6 +161,7 @@ def seed_database():
         db.flush()
 
         teacher2 = Teacher(
+            id=fixed_id("teacher_prof_sneha"),
             user_id=teacher2_user.id,
             employee_id="EMP-TCH-02",
             department_id=dept_cse.id,
@@ -202,6 +213,7 @@ def seed_database():
         seeded_student_users = []
         for reg_no, roll_no, name, email in students_info:
             stu_u = User(
+                id=fixed_id(f"user_student_{reg_no}"),
                 email=email,
                 hashed_password=hash_password("Password@123"),
                 full_name=name,
@@ -215,6 +227,7 @@ def seed_database():
 
             photo_path = FaceRecognitionService.generate_student_portrait(name, reg_no, roll_no, "CSE")
             st_rec = Student(
+                id=fixed_id(f"student_record_{reg_no}"),
                 user_id=stu_u.id,
                 registration_number=reg_no,
                 roll_number=roll_no,

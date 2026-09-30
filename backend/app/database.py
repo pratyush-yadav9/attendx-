@@ -21,7 +21,19 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 
+_db_initialized = False
+
 def get_db():
+    global _db_initialized
+    if not _db_initialized:
+        try:
+            init_db()
+            from app.seed import seed_database
+            seed_database()
+        except Exception as e:
+            print(f"[AttendX] get_db init error: {e}")
+        _db_initialized = True
+
     db = SessionLocal()
     try:
         yield db
