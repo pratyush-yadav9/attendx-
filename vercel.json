@@ -1,7 +1,7 @@
 {
   "version": 2,
   "framework": "vite",
-  "installCommand": "pip install -r requirements.txt && npm install --prefix frontend --legacy-peer-deps",
+  "installCommand": "npm install --prefix frontend --legacy-peer-deps",
   "buildCommand": "npm run build --prefix frontend",
   "outputDirectory": "frontend/dist",
   "rewrites": [
@@ -20,10 +20,6 @@
     {
       "source": "/openapi.json",
       "destination": "/api/index.py"
-    },
-    {
-      "source": "/((?!api/|uploads/|docs|openapi.json|assets/).*)",
-      "destination": "/index.html"
     }
   ]
 }
