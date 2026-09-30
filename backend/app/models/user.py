@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Enum as SQLEnum
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Text, Enum as SQLEnum
 from sqlalchemy.orm import relationship
 import enum
 from app.database import Base
@@ -44,7 +44,7 @@ class Student(Base):
     semester_id = Column(String(36), ForeignKey("semesters.id"), nullable=False)
     section_id = Column(String(36), ForeignKey("sections.id"), nullable=False)
     academic_year_id = Column(String(36), ForeignKey("academic_years.id"), nullable=False)
-    photo_url = Column(String(500), nullable=True)
+    photo_url = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 

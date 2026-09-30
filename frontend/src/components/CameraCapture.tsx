@@ -199,6 +199,14 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
     }
   };
 
+  // Automatically re-verify when registration number is entered if a photo is already selected but not yet matched
+  useEffect(() => {
+    const photoToVerify = capturedPreview || selectedPhoto;
+    if (photoToVerify && registrationNumber && registrationNumber.trim().length >= 3 && !faceResult?.is_match && !isVerifyingFace) {
+      triggerFaceVerification(photoToVerify);
+    }
+  }, [registrationNumber]);
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;

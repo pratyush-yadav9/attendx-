@@ -44,11 +44,19 @@ class FaceRecognitionService:
         except Exception as e:
             raise ValueError(f"Could not parse image: {str(e)}")
 
-    @staticmethod
-    def load_image_from_path(file_path: str) -> Optional[Image.Image]:
-        """Loads an image from filesystem safely handling relative / absolute paths."""
+    @classmethod
+    def load_image_from_path(cls, file_path: str) -> Optional[Image.Image]:
+        """Loads an image safely from base64 data URL, local path, or uploads directory."""
         if not file_path:
             return None
+        # Support persistent base64 data URLs stored directly in database records
+        if file_path.startswith("data:image/") or ";base64," in file_path:
+            try:
+                return cls.decode_base64_image(file_path)
+            except Exception as e:
+                print(f"[FaceRecognitionService] Error decoding data URL photo: {e}")
+                return None
+
         clean_path = file_path.lstrip("/").replace("\\", "/")
         if not os.path.exists(clean_path):
             alt_path = os.path.join(PROFILES_DIR, os.path.basename(clean_path))
@@ -379,15 +387,26 @@ class FaceRecognitionService:
         draw.text((12, height - 36), footer_line1[:32], fill=(255, 255, 255))
         draw.text((12, height - 20), footer_line2[:32], fill=(148, 163, 184))
 
-        filename = f"{reg_number}.jpg"
-        file_path = os.path.join(PROFILES_DIR, filename)
-        img.save(file_path, "JPEG", quality=92)
-        return f"/uploads/student_profiles/{filename}"
+        # Save to local cache
+        try:
+            filename = f"{reg_number}.jpg"
+            file_path = os.path.join(PROFILES_DIR, filename)
+            img.save(file_path, "JPEG", quality=90)
+        except Exception:
+            pass
+
+        # Return persistent base64 data URL
+        buf = BytesIO()
+        img.save(buf, format="JPEG", quality=85, optimize=True)
+        b64_str = base64.b64encode(buf.getvalue()).decode("utf-8")
+        return f"data:image/jpeg;base64,{b64_str}"
 
     @classmethod
     def get_or_create_student_reference_photo(cls, student: Student) -> str:
         """Returns existing registered photo_url or creates an authentic portrait reference."""
         if student.photo_url:
+            if student.photo_url.startswith("data:image/") or ";base64," in student.photo_url:
+                return student.photo_url
             clean = student.photo_url.lstrip("/")
             if os.path.exists(clean) or os.path.exists(os.path.join(PROFILES_DIR, os.path.basename(clean))):
                 return student.photo_url
@@ -400,6 +419,7 @@ class FaceRecognitionService:
             roll_number=student.roll_number,
             department_code=dept_code
         )
+        student.photo_url = new_url
         return new_url
 
     @classmethod
@@ -411,17 +431,29 @@ class FaceRecognitionService:
     ) -> str:
         """
         Saves a student's webcam/uploaded photo as their official biometric profile reference.
+        Stores compressed base64 data URL directly in student.photo_url for permanent
+        serverless persistence across all Vercel containers, and caches to local disk.
         """
         img = cls.decode_base64_image(photo_base64)
         norm_img = img.resize((300, 360), Image.Resampling.LANCZOS)
-        filename = f"{student.registration_number}.jpg"
-        file_path = os.path.join(PROFILES_DIR, filename)
-        norm_img.save(file_path, "JPEG", quality=90)
+        
+        # Save to local cache
+        try:
+            filename = f"{student.registration_number}.jpg"
+            file_path = os.path.join(PROFILES_DIR, filename)
+            norm_img.save(file_path, "JPEG", quality=85)
+        except Exception:
+            pass
 
-        photo_url = f"/uploads/student_profiles/{filename}"
-        student.photo_url = photo_url
+        # Convert to compact JPEG data URL for permanent database storage
+        buf = BytesIO()
+        norm_img.save(buf, format="JPEG", quality=80, optimize=True)
+        b64_str = base64.b64encode(buf.getvalue()).decode("utf-8")
+        photo_data_url = f"data:image/jpeg;base64,{b64_str}"
+
+        student.photo_url = photo_data_url
         db.commit()
-        return photo_url
+        return photo_data_url
 
     @classmethod
     def analyze_face_presence(cls, img: Image.Image) -> Tuple[str, Optional[str]]:
@@ -543,13 +575,20 @@ class FaceRecognitionService:
         target_student: Optional[Student] = None
 
         if registration_number:
+            clean_reg = registration_number.strip().upper()
             target_student = db.query(Student).filter(
-                Student.registration_number == registration_number.strip().upper()
+                Student.registration_number == clean_reg
             ).first()
             if not target_student:
                 target_student = db.query(Student).filter(
-                    Student.registration_number.ilike(registration_number.strip())
+                    Student.registration_number.ilike(clean_reg)
                 ).first()
+            if not target_student:
+                target_student = db.query(Student).filter(Student.roll_number == registration_number.strip()).first()
+            if not target_student:
+                u = db.query(User).filter(User.email == registration_number.strip().lower()).first()
+                if u and u.student_profile:
+                    target_student = u.student_profile
         elif user_id:
             target_student = db.query(Student).filter(Student.user_id == user_id).first()
 
@@ -559,23 +598,14 @@ class FaceRecognitionService:
         if target_student:
             student_details = cls._build_student_details(db, target_student, session_id)
 
-            has_registered_photo = bool(
-                target_student.photo_url and
-                os.path.exists(target_student.photo_url.lstrip("/"))
-            )
-            if not has_registered_photo:
-                return {
-                    "is_match": False,
-                    "match_status": "NO_REGISTERED_FACE",
-                    "confidence_score": 0.0,
-                    "threshold": MATCH_THRESHOLD,
-                    "message": "Face not registered.",
-                    "student": student_details,
-                    "face_verification_token": None
-                }
+            ref_img = None
+            if target_student.photo_url:
+                ref_img = cls.load_image_from_path(target_student.photo_url)
 
-            ref_photo_url = target_student.photo_url
-            ref_img = cls.load_image_from_path(ref_photo_url)
+            if not ref_img:
+                ref_photo_url = cls.get_or_create_student_reference_photo(target_student)
+                ref_img = cls.load_image_from_path(ref_photo_url)
+
             if not ref_img:
                 return {
                     "is_match": False,
@@ -590,18 +620,19 @@ class FaceRecognitionService:
             ref_vector = cls.extract_face_feature_vector(ref_img)
             best_confidence = cls.calculate_similarity(live_vector, ref_vector)
 
-            # Distance-invariant multi-scale evaluation (handles slight camera distance variations)
+            # Distance-invariant multi-scale & vertical shift evaluation (handles mobile camera distance & posture)
             lw, lh = live_image.size
-            for scale in [0.90, 1.10]:
+            for scale in [0.85, 0.95, 1.05, 1.15]:
                 dim = int(min(lw, lh) * scale)
                 if 20 < dim <= min(lw, lh):
-                    left = max(0, (lw - dim) // 2)
-                    top = max(0, (lh - dim) // 2 if lw > lh else int((lh - dim) * 0.25))
-                    c_img = live_image.crop((left, top, min(lw, left + dim), min(lh, top + dim)))
-                    c_v = cls.extract_face_feature_vector(c_img)
-                    score = cls.calculate_similarity(c_v, ref_vector)
-                    if score > best_confidence:
-                        best_confidence = score
+                    for v_ratio in [0.2, 0.25, 0.3]:
+                        left = max(0, (lw - dim) // 2)
+                        top = max(0, int((lh - dim) * v_ratio))
+                        c_img = live_image.crop((left, top, min(lw, left + dim), min(lh, top + dim)))
+                        c_v = cls.extract_face_feature_vector(c_img)
+                        score = cls.calculate_similarity(c_v, ref_vector)
+                        if score > best_confidence:
+                            best_confidence = score
 
             confidence = best_confidence
             is_match = (confidence >= MATCH_THRESHOLD)
