@@ -1,3 +1,4 @@
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from datetime import datetime, date
@@ -162,10 +163,15 @@ def create_student(
     if db.query(Student).filter(Student.registration_number == data.registration_number.strip().upper()).first():
         raise HTTPException(status_code=400, detail="Student with this registration number already exists.")
 
+    clean_reg = data.registration_number.strip().upper()
+    user_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"attendx_user_{clean_reg}"))
+    student_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"attendx_student_{clean_reg}"))
+
     new_user = User(
-        email=data.email.lower(),
+        id=user_uuid,
+        email=data.email.lower().strip(),
         hashed_password=hash_password(data.password),
-        full_name=data.full_name,
+        full_name=data.full_name.strip(),
         role=RoleEnum.STUDENT.value,
         is_active=True,
         is_verified=True
@@ -174,9 +180,10 @@ def create_student(
     db.flush()
 
     student = Student(
+        id=student_uuid,
         user_id=new_user.id,
-        registration_number=data.registration_number.strip().upper(),
-        roll_number=data.roll_number,
+        registration_number=clean_reg,
+        roll_number=data.roll_number.strip() if data.roll_number else "",
         department_id=data.department_id,
         semester_id=data.semester_id,
         section_id=data.section_id,
@@ -232,6 +239,10 @@ def get_student_details(
 ):
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
+        student = db.query(Student).filter(Student.user_id == student_id).first()
+    if not student:
+        student = db.query(Student).filter(Student.registration_number == student_id.strip().upper()).first()
+    if not student:
         raise HTTPException(status_code=404, detail="Student not found.")
 
     stats = AttendanceService.calculate_student_stats(db, student.id)
@@ -268,6 +279,16 @@ def update_student_profile(
 ):
     user, admin = auth_data
     student = db.query(Student).filter(Student.id == student_id).first()
+    if not student:
+        student = db.query(Student).filter(Student.user_id == student_id).first()
+    if not student and data.registration_number:
+        student = db.query(Student).filter(Student.registration_number == data.registration_number.strip().upper()).first()
+    if not student and data.email:
+        user_match = db.query(User).filter(User.email == data.email.lower().strip()).first()
+        if user_match and user_match.student_profile:
+            student = user_match.student_profile
+    if not student and data.roll_number:
+        student = db.query(Student).filter(Student.roll_number == data.roll_number.strip()).first()
     if not student:
         raise HTTPException(status_code=404, detail="Student not found.")
 

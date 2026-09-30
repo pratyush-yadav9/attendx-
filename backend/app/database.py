@@ -1,20 +1,38 @@
 import os
-from sqlalchemy import create_engine
+import tempfile
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 from app.config import settings
 
-db_url = settings.DATABASE_URL
+# Detect PostgreSQL connection string from environment variables or settings
+raw_db_url = (
+    os.environ.get("POSTGRES_URL")
+    or os.environ.get("DATABASE_URL")
+    or os.environ.get("POSTGRES_PRISMA_URL")
+    or os.environ.get("POSTGRES_URL_NON_POOLING")
+    or settings.DATABASE_URL
+)
+
+# SQLAlchemy requires postgresql:// instead of postgres://
+if raw_db_url.startswith("postgres://"):
+    db_url = raw_db_url.replace("postgres://", "postgresql://", 1)
+else:
+    db_url = raw_db_url
 
 # Handle SQLite vs PostgreSQL engine arguments
 connect_args = {}
 if db_url.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
     if (os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME")) and "./attendx.db" in db_url:
-        import tempfile
         db_url = "sqlite:///" + os.path.join(tempfile.gettempdir(), "attendx.db")
     engine = create_engine(db_url, connect_args=connect_args)
 else:
-    engine = create_engine(db_url, pool_pre_ping=True)
+    # Serverless-friendly PostgreSQL connection pooling
+    engine = create_engine(
+        db_url,
+        pool_pre_ping=True,
+        pool_recycle=300
+    )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

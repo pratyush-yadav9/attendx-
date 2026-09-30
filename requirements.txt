@@ -13,3 +13,4 @@ greenlet>=3.0.0
 qrcode>=7.4.2
 apscheduler>=3.10.0
 slowapi>=0.1.8
+psycopg2-binary>=2.9.9
